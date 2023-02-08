@@ -1,3 +1,5 @@
+import os.path
+
 import torch
 import torchvision
 import torchvision.transforms as transforms
@@ -50,6 +52,9 @@ def main(train=False):
 
     classes = ('plane', 'car', 'bird', 'cat',
                'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
+    if not os.path.exists("./test_input.bin"):
+        make_tune_testsets(trainloader, testloader)
+
     # 2. define the network
     net = Net()
 
@@ -170,6 +175,28 @@ class SeqNet(nn.Module):
         # x = self.fc3(x)
         # return x
 
+def make_tune_testsets(trainloader, testloader):
+    classes = ('plane', 'car', 'bird', 'cat',
+               'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
+
+    print("making lists of data")
+    tune = list(trainloader)
+    test = list(testloader)
+    tunearr = torch.zeros((10000, 3, 32, 32))
+    tunelabels = torch.zeros((10000,))
+    testarr = torch.zeros((10000, 3, 32, 32))
+    testlabels = torch.zeros((10000,))
+    for i, (tune, test) in enumerate(zip(tune, test)):
+        for j in range(4):
+            tunearr[i * j + i] = tune[0][j]
+            tunelabels[i*j + i] = tune[1][j]
+            testarr[i * j + i] = test[0][j]
+            testlabels[i*j + i] = test[1][j]
+        if i * j + i == 9999:
+            break
+    print("writing files")
+    convert_dataset_to_binary(tunearr.numpy(), tunelabels.numpy(), testarr.numpy(), testlabels.numpy())
+
 
 def convert_network_to_sequential():
     PATH = './cifar_net.pth'
@@ -190,8 +217,20 @@ def convert_network_to_sequential():
 
     torch.save(new_net.state_dict(), "./cifar_net_seq.pth")
 
-def convert_dataset_to_binary():
-    ...#TODO
+def convert_dataset_to_binary(tune, tunelabels, test, testlabels):
+
+    with open(f"tune_input.bin", "wb") as fd:
+        tune.astype("<f4").tofile(fd)  # Convert to little endian and save.
+
+    with open(f"tune_labels.bin", "wb") as fd:
+        tunelabels.astype("int32").tofile(fd)
+
+    with open(f"test_input.bin", "wb") as fd:
+        test.astype("<f4").tofile(fd)  # Convert to little endian and save.
+
+    with open(f"test_labels.bin", "wb") as fd:
+        testlabels.astype("int32").tofile(fd)
+
 
 if __name__ == '__main__':
     #convert_network_to_sequential()
